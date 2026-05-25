@@ -1,0 +1,20 @@
+# Secrets — never commit
+.env
+*.env
+!.env.example
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Prometheus data
+prometheus-data/
+
+# OS / editor
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# Backups
+*.bak

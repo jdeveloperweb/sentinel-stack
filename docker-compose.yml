@@ -1,0 +1,86 @@
+# ============================================================================
+# Sentinel Stack — full alerting pipeline
+# ----------------------------------------------------------------------------
+# Prometheus (scrape + evaluate) -> Alertmanager (route) -> relay (AI + chat)
+# Plus YACE to pull AWS CloudWatch metrics. All services share one network so
+# they can resolve each other by name.
+#
+# Copy .env.example to .env and fill it in before `docker compose up -d`.
+# ============================================================================
+
+services:
+
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    container_name: prometheus
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --web.enable-lifecycle          # enables POST /-/reload
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./config/alerts.d:/etc/prometheus/alerts.d:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - sentinel
+
+  alertmanager:
+    image: prom/alertmanager:v0.28.0
+    container_name: alertmanager
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+    volumes:
+      - ./config/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    ports:
+      - "9093:9093"
+    networks:
+      - sentinel
+
+  # AI-triage notifier. Receives Alertmanager webhooks, asks an LLM to triage,
+  # posts to chat, and optionally opens a GitHub issue. All secrets via env.
+  relay:
+    build: ./relay
+    container_name: relay
+    restart: unless-stopped
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      OPENAI_TIMEOUT_MS: ${OPENAI_TIMEOUT_MS:-8000}
+      CHAT_WEBHOOK_URL: ${CHAT_WEBHOOK_URL:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      GITHUB_REPO: ${GITHUB_REPO:-}
+      ENABLE_AI_TRIAGE: ${ENABLE_AI_TRIAGE:-true}
+      ENABLE_GITHUB_ISSUES: ${ENABLE_GITHUB_ISSUES:-false}
+    ports:
+      - "3000:3000"
+    networks:
+      - sentinel
+
+  # Generic CloudWatch -> Prometheus exporter. Optional: remove this service
+  # if you don't use AWS. Uses the instance IAM role (no access keys needed).
+  yace:
+    image: quay.io/prometheuscommunity/yet-another-cloudwatch-exporter:v0.62.1
+    container_name: yace
+    restart: unless-stopped
+    command:
+      - -config.file=/config/yace-config.yml
+      - -listen-address=:5000
+    volumes:
+      - ./config/yace-config.yml:/config/yace-config.yml:ro
+    environment:
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      # Do NOT set AWS_ACCESS_KEY_ID / SECRET here. Prefer an instance IAM role.
+    ports:
+      - "5000:5000"
+    networks:
+      - sentinel                         # MUST be the shared network (see docs)
+
+networks:
+  sentinel:
+    driver: bridge
+
+volumes:
+  prometheus-data:
