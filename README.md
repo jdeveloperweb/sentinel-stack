@@ -44,7 +44,7 @@ Everything is driven by config files and a ~120-line relay. No vendor lock-in. R
                                        ▼                                 ▼
                               ┌──────────────────┐               ┌──────────────┐
                               │ relay            │               │ on-call      │
-                              │ AI triage        │──► Chat        │ (PagerDuty / │
+                              │ AI triage        │──► Chat       │ (PagerDuty / │
                               │ + GitHub issue   │               │  iLert / …)  │
                               └──────────────────┘               └──────────────┘
 ```
