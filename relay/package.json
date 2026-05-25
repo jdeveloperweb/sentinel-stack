@@ -1,0 +1,16 @@
+{
+  "name": "sentinel-relay",
+  "version": "1.0.0",
+  "description": "AI-triage alert relay for Sentinel Stack",
+  "main": "relay.js",
+  "scripts": {
+    "start": "node relay.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  },
+  "license": "MIT"
+}

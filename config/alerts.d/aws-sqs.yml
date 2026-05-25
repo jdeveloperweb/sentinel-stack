@@ -1,0 +1,72 @@
+# ============================================================================
+# AWS SQS alert rules — Sentinel Stack
+# Metric names = CloudWatch name + lowercase statistic suffix.
+# The queue label in this YACE build is `dimension_QueueName` (NOT queue_name).
+# Verify the real label with:
+#   curl -s localhost:5000/metrics | grep aws_sqs | head
+# ============================================================================
+groups:
+  - name: aws-sqs-alerts
+    rules:
+
+      - alert: SQSBacklogHigh
+        expr: aws_sqs_approximate_number_of_messages_visible_average > 100
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "SQS backlog building up ({{ $labels.dimension_QueueName }})"
+          description: "{{ $value | humanize }} visible messages for >5m."
+
+      - alert: SQSBacklogCritical
+        expr: aws_sqs_approximate_number_of_messages_visible_average > 500
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: "SQS backlog very high ({{ $labels.dimension_QueueName }})"
+          description: "{{ $value | humanize }} visible messages. Consumer may be stuck."
+
+      # The FIFO golden signal: age of the oldest message. One stuck message
+      # blocks the whole MessageGroupId, so age beats backlog size. DLQs are
+      # excluded (messages sit there on purpose).
+      - alert: SQSMessageTooOld
+        expr: aws_sqs_approximate_age_of_oldest_message_maximum{dimension_QueueName!~".*dlq.*|.*dead.*"} > 300
+        for: 3m
+        labels: { severity: warning }
+        annotations:
+          summary: "Old unread message ({{ $labels.dimension_QueueName }})"
+          description: "Oldest message is {{ $value | humanizeDuration }} old, unprocessed."
+
+      - alert: SQSFifoHeadOfLineBlocked
+        expr: aws_sqs_approximate_age_of_oldest_message_maximum{dimension_QueueName!~".*dlq.*|.*dead.*"} > 900
+        for: 3m
+        labels: { severity: critical }
+        annotations:
+          summary: "FIFO head-of-line blocked ({{ $labels.dimension_QueueName }})"
+          description: "Message stuck {{ $value | humanizeDuration }}. In FIFO this blocks the whole group — check the consumer or move the message to the DLQ."
+
+      - alert: SQSNotConsuming
+        expr: |
+          rate(aws_sqs_number_of_messages_deleted_sum[10m]) == 0
+          and aws_sqs_approximate_number_of_messages_visible_average > 0
+        for: 10m
+        labels: { severity: critical }
+        annotations:
+          summary: "SQS not consuming ({{ $labels.dimension_QueueName }})"
+          description: "Messages present but nothing consumed in 10m."
+
+      - alert: SQSDeadLetterQueueNotEmpty
+        expr: aws_sqs_approximate_number_of_messages_visible_average{dimension_QueueName=~".*dlq.*|.*dead.*"} > 0
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: "DLQ not empty ({{ $labels.dimension_QueueName }})"
+          description: "{{ $value | humanize }} messages in the dead-letter queue. Processing failed permanently."
+
+      # If the exporter is down, every SQS alert above goes blind.
+      - alert: SQSExporterDown
+        expr: up{job="cloudwatch"} == 0
+        for: 2m
+        labels: { severity: warning }
+        annotations:
+          summary: "CloudWatch exporter down"
+          description: "YACE is not responding. SQS monitoring is blind."

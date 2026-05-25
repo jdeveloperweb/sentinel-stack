@@ -1,0 +1,43 @@
+# ============================================================================
+# Alertmanager configuration — Sentinel Stack
+# Severity-based routing: critical pages on-call AND posts to chat;
+# warning goes to chat only. Tune to taste.
+# ============================================================================
+global:
+  resolve_timeout: 5m
+
+route:
+  group_by: ["alertname", "service"]
+  group_wait: 10s
+  group_interval: 5m
+  repeat_interval: 1h
+  receiver: chat                # default: chat only
+
+  routes:
+    # Critical alerts: page on-call and also notify chat.
+    - matchers:
+        - severity = "critical"
+      receiver: oncall-and-chat
+      continue: false
+
+receivers:
+  # Chat only (via the relay, which adds AI triage).
+  - name: chat
+    webhook_configs:
+      - url: "http://relay:3000/alert"
+        send_resolved: true
+
+  # On-call provider + chat. Point the first URL at your pager (iLert,
+  # PagerDuty events API, Opsgenie, …). Configure via env or edit directly.
+  - name: oncall-and-chat
+    webhook_configs:
+      - url: "${ONCALL_WEBHOOK_URL}"     # your on-call provider
+        send_resolved: true
+      - url: "http://relay:3000/alert"
+        send_resolved: true
+
+# Optional: silence noisy alerts when a more severe one is already firing.
+inhibit_rules:
+  - source_matchers: [severity = "critical"]
+    target_matchers: [severity = "warning"]
+    equal: ["alertname", "service"]

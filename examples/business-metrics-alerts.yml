@@ -1,0 +1,38 @@
+# ============================================================================
+# Example: business-metric alerts driven by metrics YOUR app exposes.
+# These come straight from your application (Micrometer/prom-client) — no
+# exporter needed. Rename the metrics to match your own and drop into
+# config/alerts.d/.
+# ============================================================================
+groups:
+  - name: business-alerts
+    rules:
+
+      # Example: a custom health gauge your app publishes (0–100).
+      - alert: HealthScoreLow
+        expr: app_health_score_percent < 70
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "App health score low"
+          description: "Internal health score at {{ $value }}% (below 70)."
+
+      # Example: processing failures rising.
+      - alert: ProcessingFailures
+        expr: sum(rate(app_processing_failure_total[5m])) > 0.05
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "Processing failures rising"
+          description: "Failure rate {{ $value | humanize }}/s over 5m."
+
+      # Example: an internal worker receives work but completes none.
+      - alert: WorkerStalled
+        expr: |
+          rate(app_jobs_received_total[10m]) > 0
+          and sum(rate(app_jobs_completed_total[10m])) == 0
+        for: 10m
+        labels: { severity: critical }
+        annotations:
+          summary: "Worker stalled"
+          description: "Receiving jobs but completing none for 10m."

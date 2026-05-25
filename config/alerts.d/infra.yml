@@ -1,0 +1,46 @@
+# ============================================================================
+# Infrastructure alert rules — Sentinel Stack
+# JVM metrics come from Micrometer/Actuator (no extra exporter).
+# container_* metrics require cAdvisor — remove those two rules if you don't
+# run cAdvisor.
+# ============================================================================
+groups:
+  - name: infra-alerts
+    rules:
+
+      - alert: JVMHeapHigh
+        expr: |
+          sum by (instance) (jvm_memory_used_bytes{job="app", area="heap"})
+          /
+          sum by (instance) (jvm_memory_max_bytes{job="app", area="heap"}) > 0.85
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "JVM heap high"
+          description: "Heap usage at {{ $value | humanizePercentage }} for >5m."
+
+      - alert: JVMGCPauseHigh
+        expr: rate(jvm_gc_pause_seconds_sum{job="app"}[5m]) > 0.5
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "Long JVM GC pauses"
+          description: "Time spent in GC is elevated over the last 5m."
+
+      # Requires cAdvisor.
+      - alert: HighCPUUsage
+        expr: rate(container_cpu_usage_seconds_total[2m]) > 0.8
+        for: 2m
+        labels: { severity: warning }
+        annotations:
+          summary: "High CPU usage"
+          description: "Container CPU above 80% for >2m."
+
+      # Requires cAdvisor.
+      - alert: HighMemoryUsage
+        expr: container_memory_usage_bytes / container_spec_memory_limit_bytes > 0.85
+        for: 2m
+        labels: { severity: warning }
+        annotations:
+          summary: "High memory usage"
+          description: "Container memory above 85%."

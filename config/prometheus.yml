@@ -1,0 +1,45 @@
+# ============================================================================
+# Prometheus configuration — Sentinel Stack
+# Replace the <PLACEHOLDERS> with your own values. See docs/04-customization.md
+# ============================================================================
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+# Where alert rules live. Each file under alerts.d/ is loaded.
+rule_files:
+  - /etc/prometheus/alerts.d/*.yml
+
+# Send firing alerts to Alertmanager.
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
+
+scrape_configs:
+  # --- Your application -----------------------------------------------------
+  # Any service exposing Prometheus metrics (Spring Actuator, prom-client, etc.)
+  - job_name: "app"
+    metrics_path: /metrics            # Spring: /actuator/prometheus
+    static_configs:
+      - targets: ["<APP_HOST>:<APP_PORT>"]
+        labels:
+          service: <SERVICE_NAME>
+          env: <ENVIRONMENT>          # e.g. prod, staging
+
+  # --- AWS CloudWatch via YACE ---------------------------------------------
+  # Remove this job if you don't use AWS. 60s because CloudWatch updates per
+  # minute — scraping faster yields no new data.
+  - job_name: "cloudwatch"
+    metrics_path: /metrics
+    scrape_interval: 60s
+    static_configs:
+      - targets: ["yace:5000"]
+        labels:
+          service: <SERVICE_NAME>
+          env: <ENVIRONMENT>
+
+  # --- Prometheus self-monitoring ------------------------------------------
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]

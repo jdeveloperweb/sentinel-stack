@@ -1,0 +1,65 @@
+# ============================================================================
+# YACE (Yet Another CloudWatch Exporter) config — Sentinel Stack
+# Exposes AWS CloudWatch metrics in Prometheus format at :5000/metrics.
+# Metric names become: aws_<service>_<metric>_<statistic>
+#   ApproximateNumberOfMessagesVisible (Average)
+#     -> aws_sqs_approximate_number_of_messages_visible_average
+# The queue label in this build is `dimension_QueueName` (NOT queue_name).
+# ============================================================================
+apiVersion: v1alpha1
+sts-region: us-east-1            # <- change to your region
+
+discovery:
+  exportedTagsOnMetrics:
+    AWS/SQS: [Name]
+
+  jobs:
+    # --- SQS (enabled by default) -------------------------------------------
+    - type: AWS/SQS
+      regions:
+        - us-east-1              # <- your region
+      period: 60
+      length: 300
+      # Optional: only scrape resources carrying these tags (reduces noise).
+      # searchTags:
+      #   - key: monitored
+      #     value: "true"
+      metrics:
+        - name: ApproximateNumberOfMessagesVisible
+          statistics: [Average]
+        - name: ApproximateNumberOfMessagesNotVisible
+          statistics: [Average]
+        - name: ApproximateAgeOfOldestMessage      # FIFO golden signal
+          statistics: [Maximum]
+        - name: NumberOfMessagesSent
+          statistics: [Sum]
+        - name: NumberOfMessagesReceived
+          statistics: [Sum]
+        - name: NumberOfMessagesDeleted
+          statistics: [Sum]
+        - name: NumberOfEmptyReceives
+          statistics: [Sum]
+
+    # --- EC2 (example — uncomment to enable) --------------------------------
+    # - type: AWS/EC2
+    #   regions: [us-east-1]
+    #   period: 300
+    #   length: 300
+    #   metrics:
+    #     - name: CPUUtilization
+    #       statistics: [Average, Maximum]
+    #     - name: NetworkIn
+    #       statistics: [Sum]
+
+    # --- RDS (example — uncomment to enable) --------------------------------
+    # - type: AWS/RDS
+    #   regions: [us-east-1]
+    #   period: 300
+    #   length: 300
+    #   metrics:
+    #     - name: CPUUtilization
+    #       statistics: [Average]
+    #     - name: DatabaseConnections
+    #       statistics: [Average, Maximum]
+    #     - name: FreeStorageSpace
+    #       statistics: [Average]

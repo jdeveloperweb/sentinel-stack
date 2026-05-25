@@ -1,0 +1,19 @@
+# ============================================================================
+# Example: a guaranteed-fire test alert.
+# Copy into config/alerts.d/ TEMPORARILY to verify the full pipeline
+# (Prometheus -> Alertmanager -> relay -> chat) end to end.
+#
+# It uses a real metric but a threshold (>= 0) that is always true, so it fires
+# immediately — without needing a real incident. REMOVE IT AFTER TESTING, or it
+# will fire forever.
+# ============================================================================
+groups:
+  - name: test-fire
+    rules:
+      - alert: TEST_GuaranteedFire
+        expr: up{job="cloudwatch"} >= 0
+        for: 0m
+        labels: { severity: warning }
+        annotations:
+          summary: "TEST alert — verifying the path to chat"
+          description: "If you see this in chat, the pipeline works. DELETE this rule."
