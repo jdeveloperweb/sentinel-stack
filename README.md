@@ -1,5 +1,7 @@
 <div align="center">
 
+![Sentinel Stack](docs/banner.png)
+
 # 🛰️ Sentinel Stack
 
 **A drop-in, production-grade alerting pipeline for any service — with AI-powered triage.**
